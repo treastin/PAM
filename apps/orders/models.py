@@ -35,8 +35,8 @@ class Order(BaseModelMixin):
         PENDING = (1, 'Pending')
         SHIPPED = (2, 'Shipped')
         COMPLETED = (3, 'Completed')
-        CANCELED = (-1, 'Canceled')
-        REFUNDED = (0, 'Refunded')
+        CANCELED = (4, 'Canceled')
+        REFUNDED = (5, 'Refunded')
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='order')
