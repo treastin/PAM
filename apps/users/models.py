@@ -3,8 +3,8 @@ import datetime
 import phonenumbers
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import UserManager
+from django.core.mail import send_mail
 from django.db import models
-from django.utils import timezone
 
 # For verification code generation
 from string import ascii_letters, digits
@@ -12,16 +12,8 @@ from random import choices
 
 from rest_framework.exceptions import ValidationError
 
-
+from apps.common.models import BaseModel
 # Create your models here.
-
-
-class BaseModelMixin(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
 
 
 def generate_code() -> str:
@@ -48,23 +40,25 @@ def phone_is_valid(value: str):
         raise ValidationError('invalid phone number.')
 
 
-class User(BaseModelMixin, AbstractBaseUser):
+def datetime_now_plus_5_minutes():
+    return datetime.datetime.now() + datetime.timedelta(minutes=5)
 
-    class Role(models.IntegerChoices):
-        ADMIN = (0, 'Administrator')
-        COURIER = (1, 'Courier')
-        USER = (2, 'User')
+
+class User(BaseModel, AbstractBaseUser):
+
+    class Role(models.TextChoices):
+        ADMIN = ('admin', 'Administrator')
+        USER = ('user', 'User')
 
     stripe_id = models.CharField(max_length=24, blank=True)
-    name = models.CharField(max_length=120,blank=False)
-    surname = models.CharField(max_length=120, blank=False)
+    first_name = models.CharField(max_length=120, blank=False)
+    last_name = models.CharField(max_length=120, blank=False)
     profile_pic = models.ImageField(null=True, blank=True, upload_to="profile_pic/")
     phone = models.CharField(max_length=20, blank=False, unique=True, validators=[phone_is_valid])
     email = models.EmailField(unique=True)
     birthdate = models.DateField(null=True, default=None)
-    role = models.PositiveSmallIntegerField(choices=Role.choices, default=Role.USER)
-    is_active = models.BooleanField(default=True)
-    is_verified = models.BooleanField(default=False)
+    role = models.CharField(max_length=8, choices=Role.choices, default=Role.USER)
+    is_active = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
 
@@ -74,17 +68,32 @@ class User(BaseModelMixin, AbstractBaseUser):
         verbose_name = "user"
         verbose_name_plural = "users"
 
-    def generate_code(self, is_registration=True):  # TODO Send this to email
-        verification_code, code_created = UserVerification.objects.get_or_create(
+        ordering = ['-id']
+
+    def generate_code(self, is_registration=True):
+        verification_code, _ = self.verification.get_or_create(
             user=self,
             is_registration=is_registration
         )
-        if not code_created:
-            verification_code.code = generate_code()
-            verification_code.expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
-            verification_code.save()
+        verification_code.code = generate_code()
+        verification_code.expires_at = datetime_now_plus_5_minutes()
+        verification_code.save()
 
-        # TODO if is_registration send different messages
+        # TODO Make this async or parallel
+        if is_registration:
+            mail_subject = 'PAM - Verify your account '
+            mail_message = f'Here is your verification code for registration : {verification_code.code}'
+        else:
+            mail_subject = 'PAM - Password reset. '
+            mail_message = f'Here is your verification code for password reset : {verification_code.code}'
+
+        send_mail(
+            mail_subject,
+            mail_message,
+            from_email=None,
+            recipient_list=[self.email],
+            fail_silently=True
+        )
 
     def verify_code(self, verification_code) -> bool:
         verification_match = UserVerification.objects.filter(
@@ -96,16 +105,23 @@ class User(BaseModelMixin, AbstractBaseUser):
 
         return verification_match
 
+    def get_user_cart(self):
+        return self.carts.get_or_create(user=self, is_archived=False)[0]
 
-class UserVerification(BaseModelMixin):
+
+class UserVerification(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification')
-    code = models.CharField(max_length=16, default=generate_code())
-    expires_at = models.DateTimeField(default=datetime.datetime.now() + datetime.timedelta(minutes=5))
+    code = models.CharField(max_length=16, null=False, blank=False)
+    expires_at = models.DateTimeField(default=datetime_now_plus_5_minutes)
     is_completed = models.BooleanField(default=False)
     is_registration = models.BooleanField(default=False)
 
+    class Meta:
 
-class UserAddress(BaseModelMixin):
+        ordering = ['-id']
+
+
+class UserAddress(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='address')
     country = models.CharField(max_length=100)
     region = models.CharField(max_length=100)
@@ -114,4 +130,6 @@ class UserAddress(BaseModelMixin):
     block = models.CharField(max_length=10)
     zipcode = models.CharField(max_length=16)
 
+    class Meta:
 
+        ordering = ['-id']

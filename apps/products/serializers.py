@@ -32,7 +32,13 @@ class ProductCategorySerializer(serializers.ModelSerializer):
 class ProductAttachmentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductAttachments
-        fields = '__all__'
+        fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'attachment',
+            'product',
+        ]
 
         read_only_fields = [
             'id',
@@ -49,5 +55,6 @@ class ProductReviewSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'user',
         ]

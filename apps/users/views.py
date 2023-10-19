@@ -1,10 +1,11 @@
 from rest_framework import mixins
+from rest_framework.parsers import MultiPartParser
 from rest_framework.serializers import Serializer
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from django.shortcuts import get_object_or_404
 
@@ -12,19 +13,12 @@ from apps.users.models import User, UserVerification, UserAddress
 from apps.users.serializers import UserSerializer, UserVerificationSerializer, UserCodeSendSerializer, \
     UserLoginResetSerializer, UserProfileSerializer, UserPasswordUpdateSerializer, UserAddressSerializer
 
+from apps.common.permisions import IsAdminOrItself
 
 # Create your views here.
-class IsAdmin(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.role == User.Role.ADMIN
 
 
-class IsAdminOrItself(BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return (request.user.role == User.Role.ADMIN) | (obj.user == request.user)
-
-
-class UserSignupViewSet(GenericViewSet, mixins.RetrieveModelMixin):
+class UserSignupViewSet(GenericViewSet):
     """
     Used for creating and verifying new accounts.
     """
@@ -33,8 +27,16 @@ class UserSignupViewSet(GenericViewSet, mixins.RetrieveModelMixin):
     permission_classes = (AllowAny,)
 
     @action(detail=False, methods=['POST'])
-    def new(self, request, *args, **kwargs):  # TODO Change name
-        serializer = self.get_serializer(data=request.data)  # TODO get user if not verified
+    def new(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        existing_user_same_cred = self.queryset.filter(
+            email=serializer.initial_data['email'], phone=serializer.initial_data['phone'], is_active=False).first()
+        if existing_user_same_cred:
+            existing_user_same_cred.set_password(serializer.initial_data['password'])
+            data = self.get_serializer(existing_user_same_cred).data
+            return Response(data)
+
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
@@ -48,9 +50,9 @@ class UserSignupViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         data = self.get_serializer(user).data
         return Response(data)
 
-    @action(detail=True, methods=['POST'], url_path='verification/create', serializer_class=Serializer)
+    @action(detail=True, methods=['POST'], url_path='verification-create', serializer_class=Serializer)
     def generate_registration_code(self, request, pk, *args, **kwargs):
-        user = get_object_or_404(User, id=pk, is_verified=False)
+        user = get_object_or_404(User, id=pk, is_active=False)
         user.generate_code(is_registration=True)
         return Response()
 
@@ -60,12 +62,12 @@ class UserSignupViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        user = get_object_or_404(User, id=validated_data['user'].id, is_verified=False)
+        user = get_object_or_404(User, id=validated_data['user'].id, is_active=False)
 
         verification_passed = user.verify_code(validated_data['code'])
 
         if verification_passed:
-            user.is_verified = True
+            user.is_active = True
             user.save()
             user_data = UserSerializer(user).data
             return Response(user_data)
@@ -73,7 +75,7 @@ class UserSignupViewSet(GenericViewSet, mixins.RetrieveModelMixin):
             raise ValidationError({'code': 'Verification code is not valid.'})
 
 
-class UserLoginViewSet(GenericViewSet, mixins.RetrieveModelMixin):
+class UserLoginViewSet(GenericViewSet):
     """
     Used for authentication and managing existing accounts.
     """
@@ -82,11 +84,11 @@ class UserLoginViewSet(GenericViewSet, mixins.RetrieveModelMixin):
     permission_classes = (AllowAny,)
 
     @action(detail=False, methods=['POST'], serializer_class=UserCodeSendSerializer)
-    def send_code(self, request, *args, **kwargs):  # TODO better name.
+    def send_reset_code(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         data = serializer.initial_data
 
-        user = get_object_or_404(User, email=data['email'], is_verified=True)
+        user = get_object_or_404(User, email=data['email'], is_active=True)
 
         user.generate_code(is_registration=False)
 
@@ -119,12 +121,13 @@ class UserProfileViewSet(GenericViewSet, mixins.RetrieveModelMixin):
     serializer_class = UserProfileSerializer
     queryset = User.objects.all()
     permission_classes = (IsAuthenticated,)
+    parser_classes = (MultiPartParser,)
 
     @action(detail=False, methods=['GET'])
     def current(self, request, *args, **kwargs):
         return Response(UserSerializer(self.request.user).data)
 
-    @action(detail=False, methods=['PATCH'])
+    @action(detail=False, methods=['PATCH'], url_path='partial_update')
     def partial(self, request, *args, **kwargs):
         user = self.request.user
         serializer = self.get_serializer(user, data=request.data, partial=True)
@@ -132,7 +135,6 @@ class UserProfileViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         serializer.save()
 
         return Response(serializer.data)
-        # TODO Make so user can't edit other's users profile but an admin can.
 
     @action(detail=False, methods=['POST'], serializer_class=UserPasswordUpdateSerializer)
     def update_password(self, request, *args, **kwargs):
@@ -140,19 +142,14 @@ class UserProfileViewSet(GenericViewSet, mixins.RetrieveModelMixin):
 
         if user.check_password(request.data.get('old_password')):
             user.set_password(request.data.get('new_password'))
+            user.save()
         else:
-            raise ValidationError({'old_password': 'incorrect password'})  # TODO Change text
+            raise ValidationError({'old_password': 'incorrect password'})
 
         return Response(UserSerializer(user).data)
 
 
-class UserAddressViewSet(
-    GenericViewSet,
-    mixins.CreateModelMixin,
-    mixins.ListModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin
-):
+class UserAddressViewSet(ModelViewSet):
     """
     Used for managing user addresses.
     """
@@ -161,10 +158,12 @@ class UserAddressViewSet(
     permission_classes = (IsAuthenticated, IsAdminOrItself,)
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        if hasattr(self, 'swagger_fake_view'):
+            return self.queryset.none()
+
         if self.action in ['list']:
             return self.queryset.filter(user=self.request.user)
-        return qs
+        return self.queryset
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
