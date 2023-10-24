@@ -40,10 +40,6 @@ def phone_is_valid(value: str):
         raise ValidationError('invalid phone number.')
 
 
-def datetime_now_plus_5_minutes():
-    return datetime.datetime.now() + datetime.timedelta(minutes=5)
-
-
 class User(BaseModel, AbstractBaseUser):
 
     class Role(models.TextChoices):
@@ -71,13 +67,20 @@ class User(BaseModel, AbstractBaseUser):
         ordering = ['-id']
 
     def generate_code(self, is_registration=True):
-        verification_code, _ = self.verification.get_or_create(
-            user=self,
-            is_registration=is_registration
-        )
-        verification_code.code = generate_code()
-        verification_code.expires_at = datetime_now_plus_5_minutes()
-        verification_code.save()
+        try:
+            verification_code = self.verification.get(user=self, is_registration=is_registration)
+
+            verification_code.code = generate_code()
+            verification_code.expires_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
+            verification_code.save()
+
+        except self.verification.model.DoesNotExist:
+            verification_code = self.verification.create(
+                user=self,
+                is_registration=is_registration,
+                code=generate_code(),
+                expires_at=datetime.datetime.now() + datetime.timedelta(minutes=5)
+            )
 
         # TODO Make this async or parallel
         if is_registration:
@@ -95,30 +98,38 @@ class User(BaseModel, AbstractBaseUser):
             fail_silently=True
         )
 
-    def verify_code(self, verification_code) -> bool:
-        verification_match = UserVerification.objects.filter(
-            user=self,
-            code=verification_code,
-            expires_at__gte=datetime.datetime.now(),
-            is_completed=False
-        ).exists()
-
-        return verification_match
-
     def get_user_cart(self):
-        return self.carts.get_or_create(user=self, is_archived=False)[0]
+        cart, _ = self.carts.get_or_create(user=self, is_archived=False)
+        return cart
 
 
 class UserVerification(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification')
     code = models.CharField(max_length=16, null=False, blank=False)
-    expires_at = models.DateTimeField(default=datetime_now_plus_5_minutes)
+    expires_at = models.DateTimeField()
     is_completed = models.BooleanField(default=False)
     is_registration = models.BooleanField(default=False)
 
     class Meta:
 
         ordering = ['-id']
+
+    def verify_user(self) -> User:
+        """
+        Verify the user using the code. Returns user.
+        :return:
+        """
+        if self.expires_at < datetime.datetime.now():
+            raise ValidationError({'code': 'Verification code is expired'})
+
+        user = self.user
+        user.is_active = True
+        user.save()
+
+        self.is_completed = True
+        self.save()
+
+        return user
 
 
 class UserAddress(BaseModel):

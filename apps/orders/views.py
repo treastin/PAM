@@ -1,8 +1,5 @@
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Prefetch
-from django.shortcuts import get_object_or_404
+from drf_util.utils import gt
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
@@ -10,10 +7,9 @@ from rest_framework.viewsets import GenericViewSet, mixins
 from rest_framework import status
 
 from apps.common.permisions import IsAdmin
-from apps.orders.models import Order, Cart, CartItem
+from apps.orders.models import Order, Cart
 from apps.orders.serializers import OrderSerializer, CartSerializer, CartItemSerializer, CartDetailsSerializer
 from apps.users.models import User
-from apps.products.models import Products
 
 
 class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin):
@@ -22,28 +18,18 @@ class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixi
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        qs = self.queryset
+
         if hasattr(self, 'swagger_fake_view'):
-            return self.queryset.none()
+            qs = self.queryset.none()
 
-        if self.request.user.Role == 'admin':
-            return self.queryset
+        if gt(self.request.user, 'role') == User.Role.USER:
+            qs = self.queryset.filter(user=self.request.user)
 
-        if self.request.user.Role == 'user':
-            return self.queryset.filter(user=self.request.user)
-
-        return self.queryset
+        return qs
 
     def perform_create(self, serializer):
-        user_cart = Cart.objects.filter(user=self.request.user, is_archived=False).first()
-        if user_cart:
-            if not user_cart.items.count():
-                raise ValidationError({'cart': 'The cart is empty'})
-
-            serializer.save(user=self.request.user, cart=user_cart)
-            user_cart.is_archived = True
-            user_cart.save()
-        else:
-            raise ValidationError({'cart': 'The cart is empty'})
+        serializer.save(user=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -69,10 +55,12 @@ class CartViewSet(GenericViewSet):
 
     @action(detail=False, methods=['GET'], serializer_class=CartDetailsSerializer)
     def items(self, request, *args, **kwargs):
-        instance = self.queryset.filter(
-            user=self.request.user, is_archived=False).prefetch_related('items').first()
+        cart_with_items = (self.queryset
+                           .filter(user=self.request.user, is_archived=False)
+                           .prefetch_related('items')
+                           .first())
 
-        serializer = self.get_serializer(instance)
+        serializer = self.get_serializer(cart_with_items)
         return Response(serializer.data)
 
     @action(detail=True, methods=['POST'], url_path='item-update', serializer_class=CartItemSerializer)
@@ -84,5 +72,5 @@ class CartViewSet(GenericViewSet):
     @action(detail=True, methods=['DELETE'], url_path='item-remove')
     def delete_item(self, request, pk, *args, **kwargs):
         instance = self.request.user.get_user_cart()
-        instance.rm_item(pk)
+        instance.remove_item(pk)
         return Response()

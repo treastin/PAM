@@ -8,9 +8,14 @@ class IsAdmin(BasePermission):
         return request.user.role == User.Role.ADMIN
 
 
-class IsAdminOrItself(BasePermission):
+class IsAdminOrOwner(BasePermission):
     def has_object_permission(self, request, view, obj):
         return (request.user.role == User.Role.ADMIN) | (obj.user == request.user)
+
+
+class IsAdminOrItself(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return (request.user.role == User.Role.ADMIN) | (obj == request.user)
 
 
 class ReadOnly(BasePermission):

@@ -62,7 +62,7 @@ class UserPasswordUpdateSerializer(serializers.Serializer):
         ]
 
 
-class UserCodeSendSerializer(serializers.ModelSerializer):
+class UserEmailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
@@ -86,7 +86,6 @@ class UserVerificationSerializer(serializers.ModelSerializer):
         model = UserVerification
         fields = [
             'code',
-            'user',
             'expires_at'
         ]
 
@@ -95,7 +94,7 @@ class UserVerificationSerializer(serializers.ModelSerializer):
         ]
 
         extra_kwargs = {
-            'code': {'write_only': True, 'required': False}
+            'code': {'write_only': True, 'required': True}
         }
 
 

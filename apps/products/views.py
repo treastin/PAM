@@ -7,7 +7,7 @@ from rest_framework.viewsets import ModelViewSet, mixins , GenericViewSet
 from apps.products.serializers import ProductSerializer, ProductCategorySerializer, ProductReviewSerializer, \
     ProductAttachmentsSerializer
 from apps.products.models import Products, ProductReview, ProductCategory, ProductAttachments
-from apps.common.permisions import IsAdmin, IsAdminOrItself, ReadOnly
+from apps.common.permisions import IsAdmin, IsAdminOrOwner, ReadOnly
 
 # Create your views here.
 
@@ -31,7 +31,7 @@ class ProductReviewViewSet(GenericViewSet, mixins.RetrieveModelMixin,
                            mixins.CreateModelMixin):
     serializer_class = ProductReviewSerializer
     queryset = ProductReview.objects.all()
-    permission_classes = (IsAuthenticated, IsAdminOrItself | ReadOnly)
+    permission_classes = (IsAuthenticated, IsAdminOrOwner | ReadOnly)
     filterset_fields = ('product', 'rating',)
 
     def perform_create(self, serializer):

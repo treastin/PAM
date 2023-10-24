@@ -24,7 +24,7 @@ class Products(BaseModel):
     name = models.CharField(max_length=255)
     category = models.ForeignKey(ProductCategory, null=True, on_delete=models.SET_NULL)
     details = models.TextField(null=True, default=None)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
+    price = models.DecimalField(max_digits=9, decimal_places=2)
     discount = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(99)])
     specs = models.CharField(max_length=255)
 
@@ -49,7 +49,7 @@ class ProductReview(BaseModel):
 
 class ProductAttachments(BaseModel):
     product = models.ForeignKey(Products, on_delete=models.CASCADE, related_name='attachments')
-    attachment = models.ImageField()
+    attachment = models.ImageField(upload_to='product/attachments')
 
     class Meta:
         ordering = ['-id']
