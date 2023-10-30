@@ -1,4 +1,4 @@
-from django.db.models import Sum, F
+from django.db.models import Sum, F, DecimalField
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -26,6 +26,14 @@ class OrderSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class OrderStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = [
+            'status'
+        ]
+
+
 class CartSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cart
@@ -41,6 +49,8 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class CartItemSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField()
+
     class Meta:
         model = CartItem
         fields = [
@@ -48,6 +58,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'product',
+            'product_id',
             'price',
             'discount',
             'count'
@@ -60,9 +71,20 @@ class CartItemSerializer(serializers.ModelSerializer):
             'updated_at',
             'price',
             'discount',
+            'product'
         ]
 
+        extra_kwargs = {
+            'product_id': {'write_only': True, 'required': True}
+        }
+
         depth = 1
+
+    def validate(self, attrs):
+        count = attrs.get('count')
+        if count is None or count < 1:
+            raise ValidationError({'count': 'Count can\'t be less than 1'})
+        return attrs
 
 
 class CartDetailsSerializer(serializers.ModelSerializer):
@@ -82,4 +104,7 @@ class CartDetailsSerializer(serializers.ModelSerializer):
         ]
 
     def get_total(self, obj):
-        return obj.items.aggregate(total=Sum(F('price') * ((100 - F('discount')) / 100) * F('count'))).get('total')
+        total = obj.items.aggregate(
+            total=Sum(F('product__price') * ((100 - F('product__discount')) / 100.0) * F('count'),
+                      output_field=DecimalField())).get('total')
+        return total

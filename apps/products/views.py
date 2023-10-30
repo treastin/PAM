@@ -1,8 +1,6 @@
-from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, mixins , GenericViewSet
+from rest_framework.viewsets import ModelViewSet, mixins, GenericViewSet
 
 from apps.products.serializers import ProductSerializer, ProductCategorySerializer, ProductReviewSerializer, \
     ProductAttachmentsSerializer
@@ -26,9 +24,7 @@ class ProductCategoryViewSet(ModelViewSet):
     parser_classes = (MultiPartParser,)
 
 
-class ProductReviewViewSet(GenericViewSet, mixins.RetrieveModelMixin,
-                           mixins.UpdateModelMixin, mixins.DestroyModelMixin,
-                           mixins.CreateModelMixin):
+class ProductReviewViewSet(ModelViewSet):
     serializer_class = ProductReviewSerializer
     queryset = ProductReview.objects.all()
     permission_classes = (IsAuthenticated, IsAdminOrOwner | ReadOnly)
@@ -44,4 +40,3 @@ class ProductAttachmentsViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated, IsAdmin | ReadOnly)
     parser_classes = (MultiPartParser,)
     filterset_fields = ('product',)
-

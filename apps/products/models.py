@@ -26,7 +26,7 @@ class Products(BaseModel):
     details = models.TextField(null=True, default=None)
     price = models.DecimalField(max_digits=9, decimal_places=2)
     discount = models.PositiveSmallIntegerField(validators=[MinValueValidator(0), MaxValueValidator(99)])
-    specs = models.CharField(max_length=255)
+    specs = models.CharField(max_length=255, null=True)
 
     class Meta:
 

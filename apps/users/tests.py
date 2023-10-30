@@ -6,7 +6,9 @@ from rest_framework.test import APIClient
 from apps.users.models import User, UserVerification, UserAddress
 
 from datetime import datetime
-# Create your tests here.
+
+
+# Create your test here.
 
 
 class TestUserSignUp(TestCase):
@@ -33,6 +35,44 @@ class TestUserSignUp(TestCase):
         Generate verification code and verifies user using said code.
         :return:
         """
+        inactive_user = self.inactive_user
+        data = {
+            'email': inactive_user.email
+        }
+
+        response = self.client.post(reverse('signup-send-verification'), data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        code_obj = UserVerification.objects.get(user=inactive_user)
+
+        data = {
+            'code': code_obj.code
+        }
+
+        response = self.client.post(reverse('signup-confirm'), data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        inactive_user.refresh_from_db()
+        self.assertEqual(inactive_user.is_active, True)
+
+    def test_user_verification_code_resend_full_verification(self):
+        """
+        Generate verification code and verifies user using said code.
+        :return:
+        """
+        # Creating initial code
+        inactive_user = self.inactive_user
+        data = {
+            'email': inactive_user.email
+        }
+
+        response = self.client.post(reverse('signup-send-verification'), data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Refresh code if code was lost.
         inactive_user = self.inactive_user
         data = {
             'email': inactive_user.email

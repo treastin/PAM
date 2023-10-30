@@ -1,36 +1,24 @@
 from rest_framework import serializers
-
+from rest_framework.exceptions import ValidationError
 
 from apps.users.models import User, UserVerification, UserAddress
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserRegisterSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+    phone = serializers.CharField()
+    password = serializers.CharField()
+
     class Meta:
         model = User
         fields = [
-            'id',
-            'created_at',
-            'updated_at',
-            'first_name',
-            'last_name',
-            'profile_pic',
-            'phone',
             'email',
-            'password',
-            'birthdate',
+            'phone',
+            'password'
         ]
 
-        read_only_fields = [
-            'id',
-            'created_at',
-            'updated_at',
-        ]
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
 
-
-class UserProfileSerializer(serializers.ModelSerializer):
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
@@ -52,8 +40,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserPasswordUpdateSerializer(serializers.Serializer):
-    old_password = serializers.CharField(max_length=255, required=True)
-    new_password = serializers.CharField(max_length=255, required=True)
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
 
     class Meta:
         fields = [
@@ -62,11 +50,12 @@ class UserPasswordUpdateSerializer(serializers.Serializer):
         ]
 
 
-class UserEmailSerializer(serializers.ModelSerializer):
+class UserEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
     class Meta:
-        model = User
         fields = [
-            'email',
+            'email'
         ]
 
 
