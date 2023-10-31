@@ -11,6 +11,7 @@ from apps.orders.models import Order, Cart
 from apps.orders.serializers import OrderSerializer, CartSerializer, CartItemSerializer, CartDetailsSerializer, \
     OrderStatusSerializer
 from apps.users.models import User
+from config.settings import env
 
 
 class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin):
@@ -69,10 +70,16 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
 
         cart = request.user.get_user_cart()
 
-        order = cart.create_order(user=self.request.user, address=validated_data['address'])
+        order, payment_intent = cart.create_order(user=self.request.user, address=validated_data['address'])
 
         serializer = self.get_serializer(order)
-        return Response(serializer.data)
+
+        response = {
+            'order': serializer.data,
+            'client_secret': payment_intent.client_secret,
+            'stripe_publishable': env('STRIPE_PUBLISHABLE_TEST_API_KEY')
+        }
+        return Response(response)
 
     @action(detail=False, methods=['POST'], url_path='item-update', serializer_class=CartItemSerializer)
     def item_update(self, request, *args, **kwargs):

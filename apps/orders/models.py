@@ -1,3 +1,4 @@
+from apps.common.helpers import stripe, decimal_to_int_stripe
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
@@ -57,9 +58,14 @@ class Cart(BaseModel):
         self.is_archived = True
         self.save()
 
-        # Todo Create payment intent stripe
+        payment_intent = stripe.PaymentIntent.create(
+            amount=decimal_to_int_stripe(order.total),
+            currency="mdl",
+            metadata={'order_id': order.id, 'user_id': user.id},
+            automatic_payment_methods={'enabled': True, 'allow_redirects': 'never'}
+        )
 
-        return order
+        return order, payment_intent
 
 
 class CartItem(BaseModel):

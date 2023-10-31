@@ -1,19 +1,16 @@
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-
 from apps.users.models import User, UserVerification, UserAddress
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
-    phone = serializers.CharField()
-    password = serializers.CharField()
+    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = [
+            'id',
             'email',
-            'phone',
             'password'
         ]
 

@@ -39,6 +39,8 @@ class UserSignupViewSet(GenericViewSet):
         raw_password = request.valid.pop('password')
 
         user, _ = User.objects.get_or_create(**request.valid)
+        if user.is_active:
+            raise ValidationError({'user': 'user with this email exists'})
 
         user.set_password(raw_password)
         user.save()
@@ -62,7 +64,7 @@ class UserSignupViewSet(GenericViewSet):
         return Response()
 
     @action(detail=False, methods=['POST'], serializer_class=UserVerificationSerializer)
-    def confirm(self, request, *args, **kwargs):  # TODO Create stripe ID
+    def confirm(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data

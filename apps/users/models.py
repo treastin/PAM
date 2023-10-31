@@ -24,7 +24,6 @@ class User(BaseModel, AbstractBaseUser):
         ADMIN = ('admin', 'Administrator')
         USER = ('user', 'User')
 
-    stripe_id = models.CharField(max_length=24, blank=True)
     first_name = models.CharField(max_length=120, blank=False)
     last_name = models.CharField(max_length=120, blank=False)
     profile_pic = models.ImageField(null=True, blank=True, upload_to="user/profile_pic")
