@@ -26,7 +26,7 @@ class TestUserSignUp(TestCase):
             'phone': '+23594313183',
             'password': 'StrongPassword'
         }
-        response = self.client.post(reverse('signup-new'), data)
+        response = self.client.post(reverse('signup-register'), data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -36,11 +36,8 @@ class TestUserSignUp(TestCase):
         :return:
         """
         inactive_user = self.inactive_user
-        data = {
-            'email': inactive_user.email
-        }
 
-        response = self.client.post(reverse('signup-send-verification'), data)
+        response = self.client.post(reverse('signup-send-verification', kwargs={'pk': self.inactive_user.id}))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -63,26 +60,19 @@ class TestUserSignUp(TestCase):
         :return:
         """
         # Creating initial code
-        inactive_user = self.inactive_user
-        data = {
-            'email': inactive_user.email
-        }
 
-        response = self.client.post(reverse('signup-send-verification'), data)
+        response = self.client.post(reverse('signup-send-verification', kwargs={'pk': self.inactive_user.id}))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Refresh code if code was lost.
         inactive_user = self.inactive_user
-        data = {
-            'email': inactive_user.email
-        }
 
-        response = self.client.post(reverse('signup-send-verification'), data)
+        response = self.client.post(reverse('signup-send-verification', kwargs={'pk': self.inactive_user.id}))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        code_obj = UserVerification.objects.get(user=inactive_user)
+        code_obj = UserVerification.objects.filter(user=inactive_user).last()
 
         data = {
             'code': code_obj.code
@@ -105,18 +95,15 @@ class TestUserSignUp(TestCase):
             'phone': existing_user.phone,
             'password': 'StrongPassword'
         }
-        response = self.client.post(reverse('signup-new'), data)
+        response = self.client.post(reverse('signup-register'), data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_send_verification_negative(self):
-        data = {
-            'email': self.active_user.email
-        }
 
-        response = self.client.post(reverse('signup-send-verification'), data)
+        response = self.client.post(reverse('signup-send-verification', kwargs={'pk': self.active_user.id}))
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_user_verification_expired(self):
         user = User.objects.create(email='test@example.com', is_active=False)
@@ -128,7 +115,7 @@ class TestUserSignUp(TestCase):
         }
         response = self.client.post(reverse('signup-confirm'), data)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_user_invalid_number_negative(self):
         data = {
@@ -138,19 +125,19 @@ class TestUserSignUp(TestCase):
             'phone': 'DefinitelyNotAPhone',
             'password': 'StrongPassword'
         }
-        response = self.client.post(reverse('signup-new'), data)
+        response = self.client.post(reverse('signup-register'), data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_user_invalid_number_format_negative(self):
+    def test_user_nonexistent_number_negative(self):
         data = {
             'first_name': 'User',
             'last_name': 'For Testing',
             'email': 'string@mail.ogg',
-            'phone': '+93594313183',
+            'phone': '+93594313183443',
             'password': 'StrongPassword'
         }
-        response = self.client.post(reverse('signup-new'), data)
+        response = self.client.post(reverse('signup-register'), data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -240,13 +227,6 @@ class TestUserProfile(TestCase):
         self.user1 = User.objects.create(email='user1@example.com', phone='+23594315184', is_active=True)
         self.user2 = User.objects.create(email='user2@example.com', phone='+23594413184', is_active=True)
 
-    def test_user_profile_current_profile(self):
-        self.client.force_authenticate(self.user1)
-
-        response = self.client.get(reverse('user-profile-current'))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
     def test_user_profile_update(self):
         self.client.force_authenticate(self.user1)
 
@@ -282,14 +262,9 @@ class TestUserProfile(TestCase):
 
         self.client.post(reverse('user-profile-update-password'), data)
 
-        # Verify new password
-        data = {
-            'email': self.user1.email,
-            'password': new_password
-        }
-        response = self.client.post(reverse('token_obtain_pair'), data)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user1.refresh_from_db()
+        password_match = self.user1.check_password(new_password)
+        self.assertTrue(password_match)
 
     def test_user_profile_update_password_negative(self):
         old_password = 'Lorem'

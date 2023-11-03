@@ -15,14 +15,8 @@ def decimal_to_int_stripe(money):
 
 
 def generate_code() -> str:
-    """Generate a random """
-    code_len = 16
-
-    code = ''.join(
-        choices(
-            ascii_letters +
-            digits,
-            k=code_len
-        )
-    )
+    """Generate a random  code"""
+    code_len = 6
+    char_set = ascii_letters + digits
+    code = ''.join(choices(char_set, k=code_len))
     return code

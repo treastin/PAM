@@ -1,20 +1,21 @@
 from drf_util.utils import gt
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet, mixins
 from rest_framework import status
 
-from apps.common.permisions import IsAdmin
+from apps.common.permisions import IsAdmin, IsAdminOrOwner
 from apps.orders.models import Order, Cart
-from apps.orders.serializers import OrderSerializer, CartSerializer, CartItemSerializer, CartDetailsSerializer, \
-    OrderStatusSerializer
+from apps.orders.serializers import OrderSerializer, CartSerializer, CartItemDetailSerializer, CartDetailsSerializer, \
+    OrderStatusSerializer, CartItemSerializer
 from apps.users.models import User
-from config.settings import env
 
 
-class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin):
+class OrderViewSet(GenericViewSet, mixins.CreateModelMixin,
+                   mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.ListModelMixin):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     filterset_fields = ('user',)
@@ -29,6 +30,20 @@ class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixi
             qs = self.queryset.filter(user=self.request.user)
 
         return qs
+
+    def get_serializer_class(self):
+        serializer = self.serializer_class
+        if self.action in ['partial_update', 'update']:
+            serializer = OrderStatusSerializer
+
+        return serializer
+
+    def get_permissions(self):
+        permissions = [permission() for permission in self.permission_classes]
+        if self.action in ['partial_update', 'update']:
+            permissions = [IsAuthenticated(), IsAdmin()]
+
+        return permissions
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -54,6 +69,7 @@ class OrderViewSet(GenericViewSet, mixins.ListModelMixin, mixins.CreateModelMixi
 class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
+    permission_classes = (IsAuthenticated, IsAdminOrOwner,)
 
     def get_serializer_class(self):
 
@@ -72,12 +88,9 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
 
         order, payment_intent = cart.create_order(user=self.request.user, address=validated_data['address'])
 
-        serializer = self.get_serializer(order)
-
         response = {
-            'order': serializer.data,
-            'client_secret': payment_intent.client_secret,
-            'stripe_publishable': env('STRIPE_PUBLISHABLE_TEST_API_KEY')
+            'order': self.get_serializer(order).data,
+            'client_secret': payment_intent.client_secret
         }
         return Response(response)
 
@@ -88,8 +101,8 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         validated_data = serializer.validated_data
 
         user_cart = self.request.user.get_user_cart()
-        item = user_cart.add_item(validated_data['product_id'], count=validated_data.get('count'))
-        return Response(self.get_serializer(item).data)
+        item = user_cart.add_item(validated_data['product'], validated_data['count'])
+        return Response(CartItemDetailSerializer(item).data)
 
     @action(detail=False, methods=['POST'], url_path='item-remove', serializer_class=CartItemSerializer)
     def item_remove(self, request, *args, **kwargs):
@@ -98,5 +111,9 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         validated_data = serializer.validated_data
 
         user_cart = self.request.user.get_user_cart()
-        user_cart.remove_item(validated_data['product_id'])
+        deleted, _ = user_cart.items.filter(product=validated_data['product']).delete()
+
+        if not deleted:
+            raise NotFound()
+
         return Response(status=status.HTTP_204_NO_CONTENT)

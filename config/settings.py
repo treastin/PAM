@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.products',
     'apps.common',
+    'apps.logs',
 
 ]
 

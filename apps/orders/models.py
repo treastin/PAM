@@ -3,8 +3,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Sum, F, Subquery, OuterRef, DecimalField
-from rest_framework.exceptions import ValidationError, NotFound
-from rest_framework.generics import get_object_or_404
+from rest_framework.exceptions import ValidationError
 
 from apps.products.models import Products
 from apps.users.models import User, UserAddress
@@ -20,9 +19,7 @@ class Cart(BaseModel):
     class Meta:
         ordering = ['-id']
 
-    def add_item(self, item_id, count):
-        product = get_object_or_404(Products, id=item_id)
-
+    def add_item(self, product, count):
         try:
             item = self.items.get(product=product)
             if not item.count == count:
@@ -33,12 +30,6 @@ class Cart(BaseModel):
             item = self.items.create(product=product, count=count)
 
         return item
-
-    def remove_item(self, item_id):
-        deleted, _ = self.items.filter(product_id=item_id).delete()
-
-        if not deleted:
-            raise NotFound()
 
     def create_order(self, user, address):
 
@@ -55,8 +46,6 @@ class Cart(BaseModel):
                       output_field=DecimalField())).get('total')
 
         order = Order.objects.create(user=user, address=address, cart=self, total=total)
-        self.is_archived = True
-        self.save()
 
         payment_intent = stripe.PaymentIntent.create(
             amount=decimal_to_int_stripe(order.total),
@@ -94,3 +83,17 @@ class Order(BaseModel):
 
     class Meta:
         ordering = ['-id']
+
+
+class Invoice(BaseModel):
+    class Status(models.TextChoices):
+        REQUIRES_PAYMENT = ('requires_payment', 'Requires payment')
+        SUCCEEDED = ('completed', 'Completed')
+        CANCELED = ('canceled', 'Canceled')
+
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.REQUIRES_PAYMENT)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order')
+    stripe_id = models.CharField(max_length=32)
+    amount = models.DecimalField(max_digits=9, decimal_places=2)
+

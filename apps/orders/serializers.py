@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from apps.orders.models import Order, Cart, CartItem
+from apps.products.serializers import ProductSerializer
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -49,7 +50,37 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product_id = serializers.IntegerField()
+    class Meta:
+        model = CartItem
+        fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'product',
+            'price',
+            'discount',
+            'count'
+
+        ]
+
+        read_only_fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'price',
+            'discount'
+        ]
+
+    def validate(self, attrs):
+        count = attrs.get('count')
+        if self.context['view'].action in ['item_update', 'item_delete']:
+            if count is None or count < 1:
+                raise ValidationError({'count': 'Count can\'t be less than 1'})
+        return attrs
+
+
+class CartItemDetailSerializer(serializers.ModelSerializer):
+    product = ProductSerializer()
 
     class Meta:
         model = CartItem
@@ -58,7 +89,6 @@ class CartItemSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'product',
-            'product_id',
             'price',
             'discount',
             'count'
@@ -74,22 +104,9 @@ class CartItemSerializer(serializers.ModelSerializer):
             'product'
         ]
 
-        extra_kwargs = {
-            'product_id': {'write_only': True, 'required': True}
-        }
-
-        depth = 1
-
-    def validate(self, attrs):
-        count = attrs.get('count')
-        if count is None or count < 1:
-            raise ValidationError({'count': 'Count can\'t be less than 1'})
-        return attrs
-
 
 class CartDetailsSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True, read_only=True)
-
+    items = CartItemDetailSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
 
     class Meta:

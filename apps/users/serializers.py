@@ -4,15 +4,25 @@ from apps.users.models import User, UserVerification, UserAddress
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = [
             'id',
+            'first_name',
+            'last_name',
+            'phone',
             'email',
             'password'
         ]
+
+        read_only_fields = [
+            'id'
+        ]
+
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': True}
+        }
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -94,4 +104,3 @@ class UserAddressSerializer(serializers.ModelSerializer):
             'updated_at',
             'user'
         ]
-

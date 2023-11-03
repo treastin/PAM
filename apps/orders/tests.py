@@ -24,23 +24,25 @@ class TestCart(TestCase):
     def test_user_add_item_to_cart(self):
         self.client.force_authenticate(self.user)
         data = {
+            'product': self.product1.id,
             'count': 2
         }
 
-        response = self.client.post(reverse('cart-item-update', kwargs={'pk': self.product1.id}), data)
+        response = self.client.post(reverse('cart-item-update'), data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_user_update_item_count(self):
         self.client.force_authenticate(self.user)
 
-        item = self.user.get_user_cart().add_item(self.product1.id, 2)
+        item = self.user.get_user_cart().add_item(self.product1, 2)
 
         data = {
+            'product': self.product1.id,
             'count': 10
         }
 
-        response = self.client.post(reverse('cart-item-update', kwargs={'pk': self.product1.id}), data)
+        response = self.client.post(reverse('cart-item-update'), data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotEquals(item.count, response.data['count'])
@@ -48,9 +50,13 @@ class TestCart(TestCase):
     def test_user_remove_item_from_cart(self):
         self.client.force_authenticate(self.user)
 
-        self.user.get_user_cart().add_item(self.product1.id, 2)
+        self.user.get_user_cart().add_item(self.product1, 2)
 
-        response = self.client.delete(reverse('cart-item-remove', kwargs={'pk': self.product1.id}))
+        data = {
+            'product': self.product1.id
+        }
+
+        response = self.client.post(reverse('cart-item-remove'), data)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
@@ -58,10 +64,10 @@ class TestCart(TestCase):
         self.client.force_authenticate(self.user)
 
         user_cart = self.user.get_user_cart()
-        user_cart.add_item(self.product1.id, 2)
-        user_cart.add_item(self.product2.id, 1)
+        user_cart.add_item(self.product1, 2)
+        user_cart.add_item(self.product2, 1)
 
-        response = self.client.get(reverse('cart-items'))
+        response = self.client.get(reverse('cart-detail', kwargs={'pk': user_cart.id}))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['items']), 2)
@@ -69,27 +75,32 @@ class TestCart(TestCase):
     def test_user_add_item_invalid_count_negative(self):
         self.client.force_authenticate(self.user)
         data = {
+            'product': self.product1.id,
             'count': -2
         }
 
-        response = self.client.post(reverse('cart-item-update', kwargs={'pk': self.product1.id}), data)
+        response = self.client.post(reverse('cart-item-update'), data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_add_invalid_item(self):
         self.client.force_authenticate(self.user)
         data = {
+            'product': 999999,
             'count': 1
         }
 
-        response = self.client.post(reverse('cart-item-update', kwargs={'pk': 999}), data)
+        response = self.client.post(reverse('cart-item-update'), data)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_delete_invalid_item(self):
         self.client.force_authenticate(self.user)
 
-        response = self.client.delete(reverse('cart-item-remove', kwargs={'pk': self.product1.id}))
+        data = {
+            'product': self.product1.id
+        }
+        response = self.client.post(reverse('cart-item-remove'), data)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 

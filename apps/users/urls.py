@@ -1,11 +1,11 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenBlacklistView
-from apps.users.views import UserSignupViewSet, UserLoginResetViewSet, UserProfileViewSet, UserAddressViewSet
+from apps.users.views import UserSignupViewSet, UserResetViewSet, UserProfileViewSet, UserAddressViewSet
 
 router = DefaultRouter()
 router.register('signup', UserSignupViewSet, 'signup')
-router.register('login', UserLoginResetViewSet, 'login')
+router.register('login', UserResetViewSet, 'login')
 router.register('user-profile', UserProfileViewSet, 'user-profile')
 router.register('user-address', UserAddressViewSet, 'user-address')
 
