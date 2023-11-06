@@ -38,11 +38,12 @@ class UserSignupViewSet(GenericViewSet):
     def register(self, request, *args, **kwargs):
         raw_password = request.valid.pop('password')
 
-        try:
-            user = self.queryset.get(email=request.valid['email'])
-            if user.is_active:
-                raise ValidationError({'user': 'user with this email exists'})
-        except User.DoesNotExist:
+        user = self.queryset.filter(email=request.valid['email']).first()
+
+        if gt(user, 'is_active'):
+            raise ValidationError({'user': 'user with this email exists'})
+
+        if not user:
             user = self.queryset.create(**request.valid)
 
         user.set_password(raw_password)

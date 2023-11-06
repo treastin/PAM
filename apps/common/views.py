@@ -1,3 +1,4 @@
+from drf_util.utils import gt
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,7 +9,7 @@ from apps.logs.models import Log
 from apps.orders.models import Order, Invoice, Cart
 
 from apps.common.helpers import stripe
-from config.settings import env
+from config import settings
 
 status_mapping = {
     'payment_intent.succeeded': Order.Status.CONFIRMED,
@@ -27,22 +28,22 @@ class StripeWebhookView(APIView):
     def post(self, request, *args, **kwargs):
 
         event = get_event_from_request(request)
+
         order_status = status_mapping.get(event['type'])
 
         if order_status:
-            order_id = event['data']['object']['metadata'].get('order_id')
-            user_id = event['data']['object']['metadata'].get('user_id')
-            payment_intent = event['data']['object'].get('id')
+            order_id = gt(event, 'data.object.metadata.order_id')
+            user_id = gt(event, 'data.object.metadata.user_id')
 
             Order.objects.filter(id=order_id).update(status=order_status)
 
             if order_status == Order.Status.CONFIRMED:
                 Cart.objects.filter(user_id=user_id, is_archived=False).update(is_archived=True)
 
-                Invoice.objects.create(
-                    order_id=order_id, status=invoice_status_mapping.get(order_status),
-                    stripe_id=payment_intent, user_id=user_id, amount=event['data']['object']['amount']
-                )
+                Invoice.objects.filter(order_id=order_id).update(status=Invoice.Status.SUCCEEDED)
+
+            if order_status == Order.Status.CANCELED:
+                Invoice.objects.filter(order_id=order_id).update(status=Invoice.Status.CANCELED)
 
         return Response(status=status.HTTP_200_OK)
 
@@ -50,15 +51,13 @@ class StripeWebhookView(APIView):
 def get_event_from_request(request):
     payload = request.body
     sig_header = request.headers.get('STRIPE_SIGNATURE')
-    endpoint_secret = env('STRIPE_ENDPOINT_SECRET')
+    endpoint_secret = settings.STRIPE_ENDPOINT_SECRET
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, endpoint_secret
-        )
-    except (ValueError, stripe.error.SignatureVerificationError ) as e: # noqa
-        raise e
+    event = stripe.Webhook.construct_event(
+        payload, sig_header, endpoint_secret
+    )
+    event_type = event.get('type')
 
-    Log.objects.create(type=event['type'], details=event)
+    Log.objects.create(event_type=event_type, details=event)
     return event
 

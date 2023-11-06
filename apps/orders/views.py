@@ -100,7 +100,7 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
-        user_cart = self.request.user.get_user_cart()
+        user_cart = self.request.user.get_user_cart(create_if_none=True)
         item = user_cart.add_item(validated_data['product'], validated_data['count'])
         return Response(CartItemDetailSerializer(item).data)
 
@@ -111,9 +111,6 @@ class CartViewSet(GenericViewSet, mixins.RetrieveModelMixin):
         validated_data = serializer.validated_data
 
         user_cart = self.request.user.get_user_cart()
-        deleted, _ = user_cart.items.filter(product=validated_data['product']).delete()
-
-        if not deleted:
-            raise NotFound()
+        user_cart.items.filter(product=validated_data['product']).delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)

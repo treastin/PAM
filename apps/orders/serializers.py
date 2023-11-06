@@ -71,13 +71,6 @@ class CartItemSerializer(serializers.ModelSerializer):
             'discount'
         ]
 
-    def validate(self, attrs):
-        count = attrs.get('count')
-        if self.context['view'].action in ['item_update', 'item_delete']:
-            if count is None or count < 1:
-                raise ValidationError({'count': 'Count can\'t be less than 1'})
-        return attrs
-
 
 class CartItemDetailSerializer(serializers.ModelSerializer):
     product = ProductSerializer()

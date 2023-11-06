@@ -95,11 +95,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME":  env("DATABASE_NAME"),
+        "USER":  env("DATABASE_USER"),
+        "PASSWORD":  env("DATABASE_PASSWORD"),
+        "HOST":  env("DATABASE_HOST"),  # set in docker-compose.yml
+        "PORT": env("DATABASE_PORT"),  # default postgres port
     }
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -172,6 +177,12 @@ MEDIA_FOR_TESTING_ROOT = os.path.join(MEDIA_ROOT, 'test')
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Stripe
+
+STRIPE_SECRET_TEST_API_KEY = env('STRIPE_SECRET_TEST_API_KEY')
+STRIPE_ENDPOINT_SECRET = env('STRIPE_ENDPOINT_SECRET')
+
 
 # SMTP
 

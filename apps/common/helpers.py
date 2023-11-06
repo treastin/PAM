@@ -1,10 +1,11 @@
 from random import choices
 from string import ascii_letters, digits
+from config import settings
 import stripe
 
 from config.settings import env
 
-stripe.api_key = env('STRIPE_SECRET_TEST_API_KEY')
+stripe.api_key = settings.STRIPE_SECRET_TEST_API_KEY
 
 
 def decimal_to_int_stripe(money):

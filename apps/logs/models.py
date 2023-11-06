@@ -5,5 +5,6 @@ from django.db import models
 
 class Log(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    type = models.CharField(max_length=32)
+    event_type = models.CharField(max_length=32)
     details = models.JSONField()
+    error_message = models.TextField(null=True)

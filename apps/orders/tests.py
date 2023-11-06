@@ -35,7 +35,7 @@ class TestCart(TestCase):
     def test_user_update_item_count(self):
         self.client.force_authenticate(self.user)
 
-        item = self.user.get_user_cart().add_item(self.product1, 2)
+        item = self.user.get_user_cart(create_if_none=True).add_item(self.product1, 2)
 
         data = {
             'product': self.product1.id,
@@ -50,7 +50,7 @@ class TestCart(TestCase):
     def test_user_remove_item_from_cart(self):
         self.client.force_authenticate(self.user)
 
-        self.user.get_user_cart().add_item(self.product1, 2)
+        self.user.get_user_cart(create_if_none=True).add_item(self.product1, 2)
 
         data = {
             'product': self.product1.id
@@ -63,7 +63,7 @@ class TestCart(TestCase):
     def test_user_get_items(self):
         self.client.force_authenticate(self.user)
 
-        user_cart = self.user.get_user_cart()
+        user_cart = self.user.get_user_cart(create_if_none=True)
         user_cart.add_item(self.product1, 2)
         user_cart.add_item(self.product2, 1)
 
@@ -96,7 +96,7 @@ class TestCart(TestCase):
 
     def test_user_delete_invalid_item(self):
         self.client.force_authenticate(self.user)
-
+        self.user.get_user_cart(create_if_none=True)
         data = {
             'product': self.product1.id
         }

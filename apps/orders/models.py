@@ -1,3 +1,5 @@
+from drf_util.utils import gt
+
 from apps.common.helpers import stripe, decimal_to_int_stripe
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -20,13 +22,13 @@ class Cart(BaseModel):
         ordering = ['-id']
 
     def add_item(self, product, count):
-        try:
-            item = self.items.get(product=product)
-            if not item.count == count:
-                item.count = count
-                item.save()
 
-        except self.items.model.DoesNotExist:
+        item = self.items.filter(product=product).first()
+        if item and not gt(item, 'count') == count:
+            item.count = count
+            item.save()
+
+        if not item:
             item = self.items.create(product=product, count=count)
 
         return item
@@ -39,7 +41,7 @@ class Cart(BaseModel):
         price_subquery = Subquery(Products.objects.filter(id=OuterRef('product__id')).values('price')[:1])
         discount_subquery = Subquery(Products.objects.filter(id=OuterRef('product__id')).values('discount')[:1])
 
-        CartItem.objects.filter(cart=self).update(price=price_subquery, discount=discount_subquery)
+        self.items.update(price=price_subquery, discount=discount_subquery)
 
         total = self.items.aggregate(
             total=Sum(F('price') * ((100 - F('discount')) / 100.0) * F('count'),
@@ -47,12 +49,16 @@ class Cart(BaseModel):
 
         order = Order.objects.create(user=user, address=address, cart=self, total=total)
 
+        stripe_amount = decimal_to_int_stripe(order.total)
+
         payment_intent = stripe.PaymentIntent.create(
-            amount=decimal_to_int_stripe(order.total),
+            amount=stripe_amount,
             currency="mdl",
             metadata={'order_id': order.id, 'user_id': user.id},
             automatic_payment_methods={'enabled': True, 'allow_redirects': 'never'}
         )
+
+        Invoice.objects.create(order=order, stripe_id=payment_intent.id, user=user, amount=stripe_amount)
 
         return order, payment_intent
 
@@ -62,7 +68,7 @@ class CartItem(BaseModel):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     price = models.DecimalField(max_digits=9, decimal_places=2, null=True)
     discount = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(99)], null=True, default=0)
-    count = models.PositiveSmallIntegerField(default=1)
+    count = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(100)])
 
     class Meta:
         ordering = ['-id']
