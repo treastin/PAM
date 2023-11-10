@@ -1,0 +1,29 @@
+version: "2"
+services:
+
+  db:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    networks:
+      django_net:
+    environment:
+      - POSTGRES_PASSWORD=pam
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=db
+    container_name: pam-postgres
+
+  web:
+    build: .
+    container_name: pam-django
+    env_file: .env
+    ports:
+      - "8000:8000"
+    networks:
+      django_net:
+    working_dir: /app/
+    depends_on:
+      - db
+
+networks:
+  django_net:
