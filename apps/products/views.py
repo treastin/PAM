@@ -1,3 +1,5 @@
+from django.db.models import Count
+from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet, mixins, GenericViewSet
@@ -15,6 +17,18 @@ class ProductViewSet(ModelViewSet):
     queryset = Products.objects.all()
     permission_classes = (IsAuthenticated, IsAdmin | ReadOnly)
     filterset_fields = ('category',)
+
+    @action(detail=False, methods=['GET'])
+    def best_sellers(self, request, *args, **kwargs):
+        queryset = (self.filter_queryset(self.get_queryset())
+                    .exclude(carts__price=None).annotate(sold=Count('carts')).order_by('sold'))
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        return self.get_serializer(queryset, many=True)
 
 
 class ProductCategoryViewSet(ModelViewSet):

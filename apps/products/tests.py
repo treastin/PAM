@@ -1,7 +1,7 @@
 import os.path
 import shutil
 
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, File
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -34,6 +34,22 @@ class TestProduct(TestCase):
 
         response = self.client.get(reverse('product-list'))
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_user_get_bestsellers(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(reverse('product-best-sellers'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_user_get_bestsellers_negative(self):
+        """If there is no product to show"""
+        self.client.force_authenticate(self.user)
+
+        Products.objects.all().delete()
+
+        response = self.client.get(reverse('product-best-sellers'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_user_post_negative(self):
@@ -189,7 +205,7 @@ class TestProductAttachments(TestCase):
             name='test_image.jpg', content=open(self.img_path, 'rb').read(), content_type='image/jpeg')
 
         data = {
-            'product': 1,
+            'product': self.product1.id,
             'attachment': img
         }
 
@@ -200,14 +216,15 @@ class TestProductAttachments(TestCase):
     def test_admin_update(self):
         self.client.force_authenticate(self.admin)
 
+        attachment = self.product1.attachments.create(attachment=File('/media/test/green_square.jpg'))
+
         img = SimpleUploadedFile(
             name='test_image.jpg', content=open(self.img_path, 'rb').read(), content_type='image/jpeg')
         data = {
-            'product': 1,
             'attachment': img
         }
 
-        response = self.client.patch(reverse('attachments-detail', kwargs={'pk': self.product1.id}), data=data)
+        response = self.client.patch(reverse('attachments-detail', kwargs={'pk': attachment.id}), data=data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

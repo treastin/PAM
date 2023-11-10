@@ -38,9 +38,13 @@ class UserSignupViewSet(GenericViewSet):
     def register(self, request, *args, **kwargs):
         raw_password = request.valid.pop('password')
 
-        user, _ = User.objects.get_or_create(**request.valid)
-        if user.is_active:
+        user = self.queryset.filter(email=request.valid['email']).first()
+
+        if gt(user, 'is_active'):
             raise ValidationError({'user': 'user with this email exists'})
+
+        if not user:
+            user = self.queryset.create(**request.valid)
 
         user.set_password(raw_password)
         user.save()
@@ -49,12 +53,8 @@ class UserSignupViewSet(GenericViewSet):
         return Response(data, status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['POST'], url_path='send-verification', serializer_class=Serializer)
-    def send_verification(self, request, *args, **kwargs):
-        user = self.get_object()
-
-        if user.is_active:
-            return Response({'user': 'The user with this email is verified'}, status.HTTP_403_FORBIDDEN)
-
+    def send_verification(self, request, pk, *args, **kwargs):
+        user = get_object_or_404(User, id=pk, is_active=False)
         user.verification.create(
             user=user,
             is_registration=True,
@@ -82,7 +82,7 @@ class UserSignupViewSet(GenericViewSet):
         return Response(self.get_serializer(user).data)
 
 
-class UserLoginResetViewSet(GenericViewSet):
+class UserResetViewSet(GenericViewSet):
     """
     Used for authentication and managing existing accounts.
     """
@@ -135,17 +135,9 @@ class UserProfileViewSet(GenericViewSet, mixins.RetrieveModelMixin, mixins.Updat
     permission_classes = (IsAuthenticated, IsAdminOrItself | ReadOnly,)
     parser_classes = (MultiPartParser, )
 
-    def get_queryset(self):
-        qs = self.queryset
-
-        if gt(self.request.user, 'role') == User.Role.USER:
-            qs = self.queryset.filter(user=self.request.user)
-
-        return qs
-
     @action(detail=False, methods=['POST'], serializer_class=UserPasswordUpdateSerializer)
     def update_password(self, request, *args, **kwargs):
-        user = self.get_queryset().first()
+        user = self.queryset.get(id=self.request.user.id)
 
         if user.check_password(request.data.get('old_password')):
             user.set_password(request.data.get('new_password'))
@@ -170,7 +162,7 @@ class UserAddressViewSet(ModelViewSet):
         if hasattr(self, 'swagger_fake_view'):
             qs = self.queryset.none()
 
-        if self.action in ['list'] and gt(self.request.user,'role') == User.Role.USER:
+        if gt(self.request.user, 'role') == User.Role.USER:
             qs = self.queryset.filter(user=self.request.user)
         return qs
 

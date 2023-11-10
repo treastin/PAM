@@ -43,8 +43,15 @@ class User(BaseModel, AbstractBaseUser):
 
         ordering = ['-id']
 
-    def get_user_cart(self):
-        cart, _ = self.carts.get_or_create(user=self, is_archived=False)
+    def get_user_cart(self, create_if_none=False):
+        if cart := self.carts.filter(is_archived=False).first():
+            return cart
+
+        if create_if_none:
+            cart = self.carts.create(is_archived=False)
+        else:
+            raise ValidationError({'cart': 'Current user has no cart.'})
+
         return cart
 
 

@@ -1,10 +1,11 @@
 from random import choices
 from string import ascii_letters, digits
+from config import settings
 import stripe
 
 from config.settings import env
 
-stripe.api_key = env('STRIPE_SECRET_TEST_API_KEY')
+stripe.api_key = settings.STRIPE_SECRET_TEST_API_KEY
 
 
 def decimal_to_int_stripe(money):
@@ -15,14 +16,8 @@ def decimal_to_int_stripe(money):
 
 
 def generate_code() -> str:
-    """Generate a random """
-    code_len = 16
-
-    code = ''.join(
-        choices(
-            ascii_letters +
-            digits,
-            k=code_len
-        )
-    )
+    """Generate a random  code"""
+    code_len = 6
+    char_set = ascii_letters + digits
+    code = ''.join(choices(char_set, k=code_len))
     return code
