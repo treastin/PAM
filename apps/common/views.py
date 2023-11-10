@@ -1,3 +1,4 @@
+from json import loads
 from drf_util.utils import gt
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -42,7 +43,7 @@ class StripeWebhookView(APIView):
 
                 Invoice.objects.filter(order_id=order_id).update(status=Invoice.Status.SUCCEEDED)
 
-            if order_status == Order.Status.CANCELED:
+            elif order_status == Order.Status.CANCELED:
                 Invoice.objects.filter(order_id=order_id).update(status=Invoice.Status.CANCELED)
 
         return Response(status=status.HTTP_200_OK)
@@ -52,12 +53,23 @@ def get_event_from_request(request):
     payload = request.body
     sig_header = request.headers.get('STRIPE_SIGNATURE')
     endpoint_secret = settings.STRIPE_ENDPOINT_SECRET
+    event = {}
+    error_message = None
 
-    event = stripe.Webhook.construct_event(
-        payload, sig_header, endpoint_secret
-    )
-    event_type = event.get('type')
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except Exception as e:
+        error_message = e
 
-    Log.objects.create(event_type=event_type, details=event)
+    if event:
+        event_type = event.get('type')
+        details = event.copy()
+    else:
+        event_type = 'Error'
+        details = {'request_body': loads(request.body)}
+
+    Log.objects.create(event_type=event_type, details=details, error_message=error_message)
     return event
 

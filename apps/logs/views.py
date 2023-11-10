@@ -12,4 +12,4 @@ class LogViewSet(GenericViewSet, ListModelMixin):
     queryset = Log.objects.all()
     serializer_class = LogSerializer
     permission_classes = (IsAuthenticated, IsAdmin,)
-    filterset_fields = ('type',)
+    filterset_fields = ('event_type',)

@@ -28,7 +28,7 @@ class Cart(BaseModel):
             item.count = count
             item.save()
 
-        if not item:
+        elif not item:
             item = self.items.create(product=product, count=count)
 
         return item

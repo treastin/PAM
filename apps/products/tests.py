@@ -36,6 +36,22 @@ class TestProduct(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_user_get_bestsellers(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(reverse('product-best-sellers'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_user_get_bestsellers_negative(self):
+        """If there is no product to show"""
+        self.client.force_authenticate(self.user)
+
+        Products.objects.all().delete()
+
+        response = self.client.get(reverse('product-best-sellers'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_user_post_negative(self):
         self.client.force_authenticate(self.user)
 

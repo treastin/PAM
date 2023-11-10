@@ -8,3 +8,6 @@ class Log(models.Model):
     event_type = models.CharField(max_length=32)
     details = models.JSONField()
     error_message = models.TextField(null=True)
+
+    class Meta:
+        ordering = ['-id']

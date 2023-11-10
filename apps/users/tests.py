@@ -30,6 +30,18 @@ class TestUserSignUp(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_user_signup_taken_email(self):
+        data = {
+            'first_name': 'User',
+            'last_name': 'For Testing',
+            'email': self.active_user.email,
+            'phone': '+23594313183',
+            'password': 'StrongPassword'
+        }
+        response = self.client.post(reverse('signup-register'), data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_user_full_verification(self):
         """
         Generate verification code and verifies user using said code.

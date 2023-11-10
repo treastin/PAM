@@ -1,7 +1,7 @@
 from django.db.models import Sum, F, DecimalField
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
+from apps.users.serializers import UserAddressSerializer
 from apps.orders.models import Order, Cart, CartItem
 from apps.products.serializers import ProductSerializer
 
@@ -31,7 +31,22 @@ class OrderStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'status'
+            'id',
+            'created_at',
+            'updated_at',
+            'user',
+            'cart',
+            'status',
+            'total'
+        ]
+        read_only_fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'user',
+            'cart',
+            'total',
+            'address'
         ]
 
 
@@ -73,7 +88,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class CartItemDetailSerializer(serializers.ModelSerializer):
-    product = ProductSerializer()
+    product = ProductSerializer(read_only=True)
 
     class Meta:
         model = CartItem
@@ -118,3 +133,22 @@ class CartDetailsSerializer(serializers.ModelSerializer):
             total=Sum(F('product__price') * ((100 - F('product__discount')) / 100.0) * F('count'),
                       output_field=DecimalField())).get('total')
         return total
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
+    cart = CartDetailsSerializer(read_only=True)
+    address = UserAddressSerializer(read_only=True)
+
+    class Meta:
+        model = Order
+        fields = '__all__'
+
+        read_only_fields = [
+            'id',
+            'created_at',
+            'updated_at',
+            'user',
+            'cart',
+            'status',
+            'total'
+        ]
